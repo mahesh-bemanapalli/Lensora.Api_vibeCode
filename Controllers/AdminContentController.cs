@@ -92,6 +92,8 @@ public sealed class AdminContentController(
             var profile = await CurrentPhotographer();
             if (profile is null) return Forbid();
 
+            if (await db.PortfolioItems.AnyAsync(x => x.PhotographerId == profile.Id && x.DisplayOrder == request.DisplayOrder))
+                return Conflict(new { message = DisplayOrderConflict.Message });
             var item = new PortfolioItem
             {
                 PhotographerId = profile.Id,
@@ -104,6 +106,11 @@ public sealed class AdminContentController(
             db.PortfolioItems.Add(item);
             await db.SaveChangesAsync();
             return Created($"api/admin/portfolio/{item.Id}", ToResponse(item));
+        }
+        catch (DbUpdateException exception) when (DisplayOrderConflict.IsUniqueIndexViolation(exception))
+        {
+            logger.LogWarning(exception, "Portfolio display order conflict. Order: {DisplayOrder}", request.DisplayOrder);
+            return Conflict(new { message = DisplayOrderConflict.Message });
         }
         catch (Exception exception)
         {
@@ -122,6 +129,8 @@ public sealed class AdminContentController(
 
             var item = await db.PortfolioItems.SingleOrDefaultAsync(x => x.Id == id && x.PhotographerId == profile.Id);
             if (item is null) return NotFound();
+            if (await db.PortfolioItems.AnyAsync(x => x.PhotographerId == profile.Id && x.Id != id && x.DisplayOrder == request.DisplayOrder))
+                return Conflict(new { message = DisplayOrderConflict.Message });
 
             item.ImageUrl = request.ImageUrl.Trim();
             item.ImagePublicId = Clean(request.ImagePublicId);
@@ -130,6 +139,11 @@ public sealed class AdminContentController(
             item.DisplayOrder = request.DisplayOrder;
             await db.SaveChangesAsync();
             return NoContent();
+        }
+        catch (DbUpdateException exception) when (DisplayOrderConflict.IsUniqueIndexViolation(exception))
+        {
+            logger.LogWarning(exception, "Portfolio display order conflict. ItemId: {ItemId}; Order: {DisplayOrder}", id, request.DisplayOrder);
+            return Conflict(new { message = DisplayOrderConflict.Message });
         }
         catch (Exception exception)
         {
@@ -191,6 +205,8 @@ public sealed class AdminContentController(
             var profile = await CurrentPhotographer();
             if (profile is null) return Forbid();
 
+            if (await db.GearItems.AnyAsync(x => x.PhotographerId == profile.Id && x.DisplayOrder == request.DisplayOrder))
+                return Conflict(new { message = DisplayOrderConflict.Message });
             var item = new GearItem
             {
                 PhotographerId = profile.Id,
@@ -207,6 +223,11 @@ public sealed class AdminContentController(
             db.GearItems.Add(item);
             await db.SaveChangesAsync();
             return Created($"api/admin/gear/{item.Id}", ToResponse(item));
+        }
+        catch (DbUpdateException exception) when (DisplayOrderConflict.IsUniqueIndexViolation(exception))
+        {
+            logger.LogWarning(exception, "Gear display order conflict. Order: {DisplayOrder}", request.DisplayOrder);
+            return Conflict(new { message = DisplayOrderConflict.Message });
         }
         catch (Exception exception)
         {
@@ -225,6 +246,8 @@ public sealed class AdminContentController(
 
             var item = await db.GearItems.SingleOrDefaultAsync(x => x.Id == id && x.PhotographerId == profile.Id);
             if (item is null) return NotFound();
+            if (await db.GearItems.AnyAsync(x => x.PhotographerId == profile.Id && x.Id != id && x.DisplayOrder == request.DisplayOrder))
+                return Conflict(new { message = DisplayOrderConflict.Message });
 
             item.Name = request.Name.Trim();
             item.Category = request.Category.Trim();
@@ -237,6 +260,11 @@ public sealed class AdminContentController(
             item.DisplayOrder = request.DisplayOrder;
             await db.SaveChangesAsync();
             return NoContent();
+        }
+        catch (DbUpdateException exception) when (DisplayOrderConflict.IsUniqueIndexViolation(exception))
+        {
+            logger.LogWarning(exception, "Gear display order conflict. ItemId: {ItemId}; Order: {DisplayOrder}", id, request.DisplayOrder);
+            return Conflict(new { message = DisplayOrderConflict.Message });
         }
         catch (Exception exception)
         {

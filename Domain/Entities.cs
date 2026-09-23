@@ -88,6 +88,23 @@ public sealed class Photographer
         set;
     }
     = [];
+    public ICollection<Package> Packages { get; set; } = [];
+}
+public sealed class Package
+{
+    public int Id { get; set; }
+    public int PhotographerId { get; set; }
+    public required string Name { get; set; }
+    public required string Description { get; set; }
+    public required string ImageUrl { get; set; }
+    public string? ImagePublicId { get; set; }
+    public decimal Price { get; set; }
+    public required string Currency { get; set; }
+    public int? CoverageHours { get; set; }
+    public string? Deliverables { get; set; }
+    public bool IsPublished { get; set; }
+    public int DisplayOrder { get; set; }
+    public Photographer? Photographer { get; set; }
 }
 public sealed class PortfolioItem
 {
@@ -207,6 +224,8 @@ public sealed class Booking
         get;
         set;
     }
+    public int? PackageId { get; set; }
+    public Package? Package { get; set; }
     public required string ClientName
     {
         get;
