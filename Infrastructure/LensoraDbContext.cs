@@ -10,6 +10,7 @@ public sealed class LensoraDbContext(DbContextOptions<LensoraDbContext> options)
     public DbSet<GearItem> GearItems => Set<GearItem>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Package> Packages => Set<Package>();
+    public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<User>(entity =>
@@ -61,7 +62,26 @@ public sealed class LensoraDbContext(DbContextOptions<LensoraDbContext> options)
             entity.HasOne(x => x.Photographer).WithMany().HasForeignKey(x => x.PhotographerId);
             entity.HasOne(x => x.Package).WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.NoAction);
             entity.Property(x => x.Status).HasMaxLength(20);
+            entity.Property(x => x.ClientPhone).HasMaxLength(16);
+            entity.Property(x => x.WhatsAppConsentVersion).HasMaxLength(40);
+              entity.Property(x => x.InternalNotes).HasMaxLength(4000);
+              entity.Property(x => x.AgreedAmount).HasPrecision(12, 2);
+              entity.Property(x => x.AmountReceived).HasPrecision(12, 2);
+              entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.HasMany(x => x.Notifications).WithOne(x => x.Booking).HasForeignKey(x => x.BookingId);
         }
         );
+        model.Entity<NotificationOutbox>(entity =>
+        {
+            entity.Property(x => x.EventType).HasMaxLength(40);
+            entity.Property(x => x.Channel).HasMaxLength(20);
+            entity.Property(x => x.Recipient).HasMaxLength(320);
+            entity.Property(x => x.Status).HasMaxLength(20);
+            entity.Property(x => x.ProviderMessageId).HasMaxLength(255);
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.Status, x.NextAttemptUtc });
+            entity.HasIndex(x => x.ProviderMessageId);
+            entity.HasIndex(x => new { x.BookingId, x.EventType, x.Channel, x.Recipient }).IsUnique();
+        });
     }
 }
