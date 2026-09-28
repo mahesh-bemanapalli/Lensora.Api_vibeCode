@@ -43,6 +43,9 @@ if (string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationExcep
 builder.Services.AddDbContext<LensoraDbContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<CloudinaryMediaService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<BookingMessageSender>();
+builder.Services.AddHostedService<NotificationWorker>();
 builder.Services.AddCors(options => options.AddPolicy("frontend", policy => policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? []).AllowAnyHeader().AllowAnyMethod()));
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key must be configured through user secrets or environment variables.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters

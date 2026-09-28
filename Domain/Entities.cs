@@ -236,6 +236,16 @@ public sealed class Booking
         get;
         set;
     }
+    public string? ClientPhone { get; set; }
+    public bool WhatsAppOptIn { get; set; }
+    public DateTime? WhatsAppOptInUtc { get; set; }
+    public string? WhatsAppConsentVersion { get; set; }
+    public string? InternalNotes { get; set; }
+    public DateTime? FollowUpUtc { get; set; }
+    public decimal? AgreedAmount { get; set; }
+    public decimal AmountReceived { get; set; }
+    public string Currency { get; set; } = "INR";
+    public ICollection<NotificationOutbox> Notifications { get; set; } = [];
     public DateOnly EventDate
     {
         get;
@@ -262,4 +272,21 @@ public sealed class Booking
         get;
         set;
     }
+}
+
+public sealed class NotificationOutbox
+{
+    public long Id { get; set; }
+    public int BookingId { get; set; }
+    public Booking? Booking { get; set; }
+    public required string EventType { get; set; }
+    public required string Channel { get; set; }
+    public required string Recipient { get; set; }
+    public required string Status { get; set; }
+    public int Attempts { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public DateTime NextAttemptUtc { get; set; }
+    public DateTime? SentUtc { get; set; }
+    public string? ProviderMessageId { get; set; }
+    public string? LastError { get; set; }
 }
