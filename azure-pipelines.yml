@@ -53,5 +53,5 @@ steps:
   inputs:
     azureSubscription: 'Lensora-Azure-Connection'
     appType: 'webApp'
-    appName: 'lensora-api-mahesh-demo-e3h8eehwa9bwcdaz'
+    appName: 'lensora-api-mahesh-demo'
     package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
