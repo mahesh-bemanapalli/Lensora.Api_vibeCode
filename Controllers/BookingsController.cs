@@ -94,7 +94,7 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
         if (photographerId is null) return Forbid();
         var booking = await db.Bookings.Include(x => x.Notifications).SingleOrDefaultAsync(x => x.Id == id && x.PhotographerId == photographerId);
         if (booking is null) return NotFound();
-        var allowed = booking.Status == "Pending" && request.Status is ("Accepted" or "Rejected")
+        var allowed = booking.Status == "Pending" && request.Status is ("Confirmed" or "Rejected")
             || booking.Status == "Accepted" && request.Status == "Confirmed";
         if (!allowed) return Conflict(new { message = "This status change is not allowed for the current booking state." });
         booking.Status = request.Status;
@@ -154,6 +154,8 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
         var notification = await db.NotificationOutbox.SingleOrDefaultAsync(x =>
             x.Id == notificationId && x.BookingId == id && x.Booking!.PhotographerId == photographerId);
         if (notification is null) return NotFound();
+        if (notification.EventType == "Accepted")
+            return Conflict(new { message = "Accepted notifications are no longer sent. Confirm the booking to send a confirmation." });
         if (notification.Status != "Failed")
             return Conflict(new { message = "Only failed messages can be retried." });
         notification.Status = "Queued";

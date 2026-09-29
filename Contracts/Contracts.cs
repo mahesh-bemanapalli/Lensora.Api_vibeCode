@@ -5,7 +5,7 @@ public sealed record RegisterRequest([Required, EmailAddress, StringLength(320)]
 public sealed record LoginRequest([Required, EmailAddress] string Email, [Required] string Password);
 public sealed record TokenResponse(string Token);
 public sealed record CreateBookingRequest([Required, StringLength(120)] string ClientName, [Required, EmailAddress] string ClientEmail, DateOnly EventDate, [StringLength(2000)] string? Message, int? PackageId, [RegularExpression(@"^\+[1-9]\d{7,14}$")] string? ClientPhone, bool WhatsAppOptIn);
-public sealed record UpdateBookingStatusRequest([Required, RegularExpression("^(Accepted|Rejected|Confirmed)$")] string Status);
+public sealed record UpdateBookingStatusRequest([Required, RegularExpression("^(Rejected|Confirmed)$")] string Status);
 public sealed record UpdateBookingFollowUpRequest([StringLength(4000)] string? InternalNotes, DateTime? FollowUpUtc);
 public sealed record UpdateBookingFinancialsRequest(decimal? AgreedAmount, decimal AmountReceived, [Required, RegularExpression("^[A-Z]{3}$")] string Currency);
 public sealed record PublicProfileResponse(string Name, string Slug, string? Bio, string? Location, string? ProfileImageUrl, IReadOnlyList<PortfolioItemResponse> Portfolio, IReadOnlyList<GearItemResponse> Gear, IReadOnlyList<PackageResponse> Packages);

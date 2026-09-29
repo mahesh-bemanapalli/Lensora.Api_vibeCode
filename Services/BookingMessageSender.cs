@@ -19,7 +19,6 @@ public sealed class BookingMessageSender(IConfiguration configuration, IHttpClie
         {
             "InquiryReceived" => "We received your photography inquiry",
             "NewInquiry" => "New booking inquiry",
-            "Accepted" => "Your photography inquiry was accepted",
             "Rejected" => "Update on your photography inquiry",
             "Confirmed" => "Your photography booking is confirmed",
             _ => throw new InvalidOperationException("Unknown notification event.")
@@ -29,7 +28,6 @@ public sealed class BookingMessageSender(IConfiguration configuration, IHttpClie
         {
             "InquiryReceived" => $"Hello {booking.ClientName},\n\nWe received your inquiry for {photographerName}. This is not yet a confirmed booking. We will follow up soon.\n\n{summary}",
             "NewInquiry" => $"A new inquiry arrived from {booking.ClientName} ({booking.ClientEmail}).\n\n{summary}\n\nOpen the Lensora dashboard to respond.",
-            "Accepted" => $"Hello {booking.ClientName},\n\n{photographerName} accepted your inquiry and would like to proceed. Your session is not yet confirmed; the photographer will share next steps.\n\n{summary}",
             "Rejected" => $"Hello {booking.ClientName},\n\n{photographerName} cannot accept your inquiry for this date. You may contact the photographer about alternatives.\n\n{summary}",
             "Confirmed" => $"Hello {booking.ClientName},\n\nYour session with {photographerName} has been confirmed.\n\n{summary}",
             _ => throw new InvalidOperationException("Unknown notification event.")
