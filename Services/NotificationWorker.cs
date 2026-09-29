@@ -39,8 +39,14 @@ public sealed class NotificationWorker(IServiceScopeFactory scopeFactory, ILogge
         var db = scope.ServiceProvider.GetRequiredService<LensoraDbContext>();
         var sender = scope.ServiceProvider.GetRequiredService<BookingMessageSender>();
         var now = DateTime.UtcNow;
+        // Retire unsent messages from the old intermediate booking status.
+        await db.NotificationOutbox
+            .Where(x => x.EventType == "Accepted" && (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing" || x.Status == "Failed"))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, "Cancelled")
+                .SetProperty(x => x.LastError, "Accepted notifications are no longer sent."), cancellationToken);
         var ids = await db.NotificationOutbox.AsNoTracking()
-            .Where(x => (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing")
+            .Where(x => x.EventType != "Accepted" && (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing")
                 && x.NextAttemptUtc <= now)
             .OrderBy(x => x.NextAttemptUtc).Select(x => x.Id).Take(10).ToListAsync(cancellationToken);
 
