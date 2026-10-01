@@ -1,3 +1,4 @@
+using Lensora.Api.Domain;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -72,12 +73,12 @@ public sealed class WhatsAppWebhookController(IConfiguration configuration, Lens
                     if (messageId is null || status is null) continue;
                     var notification = await db.NotificationOutbox.SingleOrDefaultAsync(
                         x => x.Channel == "WhatsApp" && x.ProviderMessageId == messageId, cancellationToken);
-                    if (notification is null) continue;
-                    if (status == "read") notification.Status = "Read";
-                    else if (status == "delivered" && notification.Status != "Read") notification.Status = "Delivered";
-                    else if (status == "failed" && notification.Status is not ("Delivered" or "Read"))
+                    if (notification is null || notification.Status == NotificationStatus.Cancelled) continue;
+                    if (status == "read") notification.Status = NotificationStatus.Read;
+                    else if (status == "delivered" && notification.Status != NotificationStatus.Read) notification.Status = NotificationStatus.Delivered;
+                    else if (status == "failed" && notification.Status is not (NotificationStatus.Delivered or NotificationStatus.Read))
                     {
-                        notification.Status = "Failed";
+                        notification.Status = NotificationStatus.Failed;
                         notification.LastError = "WhatsApp reported a delivery failure.";
                     }
                 }

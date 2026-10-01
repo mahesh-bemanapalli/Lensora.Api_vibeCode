@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Event log verification outputs
+build-check/event-logging/
+build-check/EventLogChecks/bin/
+build-check/EventLogChecks/obj/

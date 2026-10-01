@@ -1,3 +1,4 @@
+using Lensora.Api.Domain;
 using Lensora.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ public sealed class NotificationWorker(IServiceScopeFactory scopeFactory, ILogge
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        logger.LogInformation("Notification worker started.");
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -39,24 +41,16 @@ public sealed class NotificationWorker(IServiceScopeFactory scopeFactory, ILogge
         var db = scope.ServiceProvider.GetRequiredService<LensoraDbContext>();
         var sender = scope.ServiceProvider.GetRequiredService<BookingMessageSender>();
         var now = DateTime.UtcNow;
-        // Retire unsent messages from the old intermediate booking status.
-        await db.NotificationOutbox
-            .Where(x => x.EventType == "Accepted" && (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing" || x.Status == "Failed"))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.Status, "Cancelled")
-                .SetProperty(x => x.LastError, "Accepted notifications are no longer sent."), cancellationToken);
         var ids = await db.NotificationOutbox.AsNoTracking()
-            .Where(x => x.EventType != "Accepted" && (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing")
-                && x.NextAttemptUtc <= now)
+            .ReadyToProcess(now)
             .OrderBy(x => x.NextAttemptUtc).Select(x => x.Id).Take(10).ToListAsync(cancellationToken);
 
         foreach (var id in ids)
         {
             var claimed = await db.NotificationOutbox
-                .Where(x => x.Id == id && (x.Status == "Queued" || x.Status == "Retry" || x.Status == "Processing")
-                    && x.NextAttemptUtc <= now)
+                .ReadyToProcess(now).Where(x => x.Id == id)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, "Processing")
+                    .SetProperty(x => x.Status, NotificationStatus.Processing)
                     .SetProperty(x => x.Attempts, x => x.Attempts + 1)
                     .SetProperty(x => x.NextAttemptUtc, now.AddMinutes(5)), cancellationToken);
             if (claimed == 0) continue;
@@ -64,15 +58,25 @@ public sealed class NotificationWorker(IServiceScopeFactory scopeFactory, ILogge
             var notification = await db.NotificationOutbox.Include(x => x.Booking)!
                 .ThenInclude(x => x!.Package).SingleAsync(x => x.Id == id, cancellationToken);
             var booking = notification.Booking!;
+            using var logScope = logger.BeginScope(new Dictionary<string, object>
+            {
+                ["NotificationId"] = notification.Id,
+                ["BookingId"] = notification.BookingId,
+                ["Channel"] = notification.Channel,
+                ["EventType"] = notification.EventType,
+                ["Attempt"] = notification.Attempts
+            });
+            logger.LogInformation("Notification attempt started.");
             var photographerName = await db.Photographers.Where(x => x.Id == booking.PhotographerId)
                 .Select(x => x.Name).SingleAsync(cancellationToken);
             try
             {
                 notification.ProviderMessageId = await sender.SendAsync(notification, booking,
                     photographerName, booking.Package?.Name, cancellationToken);
-                notification.Status = "Sent";
+                notification.Status = NotificationStatus.Sent;
                 notification.SentUtc = DateTime.UtcNow;
                 notification.LastError = null;
+                logger.LogInformation("Notification accepted by provider. Delivery to the recipient is not yet verified.");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -81,12 +85,26 @@ public sealed class NotificationWorker(IServiceScopeFactory scopeFactory, ILogge
             catch (Exception exception)
             {
                 notification.Status = exception is NotificationConfigurationException || notification.Attempts >= 5
-                    ? "Failed" : "Retry";
+                    ? NotificationStatus.Failed : NotificationStatus.Retry;
                 notification.NextAttemptUtc = DateTime.UtcNow.AddMinutes(Math.Min(60, Math.Pow(2, notification.Attempts)));
-                notification.LastError = exception.Message.Length > 1000 ? exception.Message[..1000] : exception.Message;
-                logger.LogWarning(exception, "Notification {NotificationId} failed on attempt {Attempt}.", id, notification.Attempts);
+                var safeError = exception is NotificationConfigurationException or NotificationDeliveryException
+                    ? exception.Message : $"Notification send failed ({exception.GetType().Name}). Check provider connectivity and configuration.";
+                notification.LastError = safeError;
+                logger.Log(notification.Status == NotificationStatus.Failed ? LogLevel.Error : LogLevel.Warning, exception,
+                    "Notification attempt failed. Status: {NotificationStatus}; Error: {Error}; ErrorType: {ErrorType}; Next retry: {NextRetryUtc}",
+                    notification.Status, safeError, exception.GetType().Name,
+                    notification.Status == NotificationStatus.Retry ? notification.NextAttemptUtc : (DateTime?)null);
             }
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Notification result persisted. Status: {NotificationStatus}", notification.Status);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "Could not persist notification result. The provider may already have accepted the message; check before retrying.");
+                throw;
+            }
             db.ChangeTracker.Clear();
         }
     }

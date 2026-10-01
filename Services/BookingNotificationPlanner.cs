@@ -23,7 +23,7 @@ public static class BookingNotificationPlanner
         EventType = eventType,
         Channel = channel,
         Recipient = recipient,
-        Status = "Queued",
+        Status = NotificationStatus.Queued,
         CreatedUtc = now,
         NextAttemptUtc = now
     };

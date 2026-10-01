@@ -8,6 +8,7 @@ using Lensora.Api.Domain;
 namespace Lensora.Api.Services;
 
 public sealed class NotificationConfigurationException(string message) : Exception(message);
+public sealed class NotificationDeliveryException(string message) : Exception(message);
 
 public sealed class BookingMessageSender(IConfiguration configuration, IHttpClientFactory httpClientFactory)
 {
@@ -59,7 +60,15 @@ public sealed class BookingMessageSender(IConfiguration configuration, IHttpClie
         if (!string.IsNullOrWhiteSpace(user))
             client.Credentials = new NetworkCredential(user, configuration["Email:Password"]);
         using var message = new MailMessage(from, recipient, subject, body);
-        await client.SendMailAsync(message, cancellationToken);
+        try
+        {
+            await client.SendMailAsync(message, cancellationToken);
+        }
+        catch (SmtpException exception)
+        {
+            // Provider exception text can contain recipient addresses; retain the code only.
+            throw new NotificationDeliveryException($"SMTP send failed. Status: {exception.StatusCode} ({(int)exception.StatusCode}).");
+        }
     }
 
     private async Task<string?> SendWhatsAppAsync(NotificationOutbox notification, string clientName,
@@ -100,7 +109,21 @@ public sealed class BookingMessageSender(IConfiguration configuration, IHttpClie
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         using var response = await httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"WhatsApp API returned {(int)response.StatusCode}.");
+        {
+            var details = "";
+            try
+            {
+                await using var errorStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var errorDocument = await JsonDocument.ParseAsync(errorStream, cancellationToken: cancellationToken);
+                if (errorDocument.RootElement.ValueKind == JsonValueKind.Object && errorDocument.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+                {
+                    if (error.TryGetProperty("code", out var code) && code.ValueKind == JsonValueKind.Number && code.TryGetInt32(out var number)) details += $" Code: {number}.";
+                    if (error.TryGetProperty("error_subcode", out var subcode) && subcode.ValueKind == JsonValueKind.Number && subcode.TryGetInt32(out var subnumber)) details += $" Subcode: {subnumber}.";
+                }
+            }
+            catch (JsonException) { /* Non-JSON provider errors still retain the HTTP status. */ }
+            throw new NotificationDeliveryException($"WhatsApp API returned HTTP {(int)response.StatusCode}.{details}");
+        }
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         return document.RootElement.TryGetProperty("messages", out var messages) && messages.GetArrayLength() > 0
