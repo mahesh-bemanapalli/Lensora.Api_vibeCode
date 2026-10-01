@@ -10,7 +10,7 @@ using Microsoft.Data.SqlClient;
 namespace Lensora.Api.Controllers;
 
 [ApiController, Route("api")]
-public sealed class BookingsController(LensoraDbContext db) : ControllerBase
+public sealed class BookingsController(LensoraDbContext db, ILogger<BookingsController> logger) : ControllerBase
 {
     private const string DuplicateBookingMessage = "An inquiry for this event date has already been sent using this email address.";
 
@@ -80,9 +80,10 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
                 x.AgreedAmount, x.AmountReceived, x.AgreedAmount - x.AmountReceived, x.Currency
             )).ToList());
         }
-        catch (Exception ex)
+        catch
         {
-            return null!;
+            // Preserve the original exception for the global logger and trace ID.
+            throw;
         }
       
 
@@ -156,13 +157,15 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
         if (notification is null) return NotFound();
         if (notification.EventType == "Accepted")
             return Conflict(new { message = "Accepted notifications are no longer sent. Confirm the booking to send a confirmation." });
-        if (notification.Status != "Failed")
+        if (notification.Status != NotificationStatus.Failed)
             return Conflict(new { message = "Only failed messages can be retried." });
-        notification.Status = "Queued";
+        notification.Status = NotificationStatus.Queued;
         notification.Attempts = 0;
         notification.NextAttemptUtc = DateTime.UtcNow;
         notification.LastError = null;
         await db.SaveChangesAsync();
+        logger.LogInformation("Notification retry requested. NotificationId: {NotificationId}; BookingId: {BookingId}; Channel: {Channel}; EventType: {EventType}",
+            notification.Id, notification.BookingId, notification.Channel, notification.EventType);
         return NoContent();
     }
     private async Task<int?> GetPhotographerId()
