@@ -7,6 +7,17 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+var telemetryConnection = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+if (!string.IsNullOrWhiteSpace(telemetryConnection))
+{
+    builder.Services.AddApplicationInsightsTelemetry(options =>
+    {
+        options.ConnectionString = telemetryConnection;
+        options.EnableAdaptiveSampling = false;
+    });
+    builder.Logging.AddFilter<Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider>(
+        "Lensora.Api", LogLevel.Information);
+}
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddControllers();
@@ -41,6 +52,12 @@ builder.Services.AddSwaggerGen(options =>
 var connectionString = builder.Configuration.GetConnectionString("Lensora") ?? builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationException("Configure ConnectionStrings:Lensora or ConnectionStrings:DefaultConnection before starting the API.");
 builder.Services.AddDbContext<LensoraDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<EventLogDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<EventLogQueue>();
+builder.Services.AddSingleton<ILoggerProvider, EventLogProvider>();
+builder.Logging.AddFilter<EventLogProvider>("Lensora.Api", LogLevel.Information);
+builder.Services.AddHostedService<EventLogWriter>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<CloudinaryMediaService>();
 builder.Services.AddHttpClient();
@@ -62,12 +79,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 );
 builder.Services.AddAuthorization();
 var app = builder.Build();
+app.Logger.LogInformation("Application Insights enabled: {TelemetryEnabled}", !string.IsNullOrWhiteSpace(telemetryConnection));
+app.UseRouting();
+app.UseMiddleware<ApiEventLoggingMiddleware>();
 app.UseExceptionHandler();
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 app.UseHttpsRedirection();
 app.UseCors("frontend");
 app.UseAuthentication();

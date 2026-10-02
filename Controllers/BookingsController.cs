@@ -10,7 +10,7 @@ using Microsoft.Data.SqlClient;
 namespace Lensora.Api.Controllers;
 
 [ApiController, Route("api")]
-public sealed class BookingsController(LensoraDbContext db) : ControllerBase
+public sealed class BookingsController(LensoraDbContext db, ILogger<BookingsController> logger) : ControllerBase
 {
     private const string DuplicateBookingMessage = "An inquiry for this event date has already been sent using this email address.";
 
@@ -80,9 +80,10 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
                 x.AgreedAmount, x.AmountReceived, x.AgreedAmount - x.AmountReceived, x.Currency
             )).ToList());
         }
-        catch (Exception ex)
+        catch
         {
-            return null!;
+            // Preserve the original exception for the global logger and trace ID.
+            throw;
         }
       
 
@@ -94,7 +95,7 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
         if (photographerId is null) return Forbid();
         var booking = await db.Bookings.Include(x => x.Notifications).SingleOrDefaultAsync(x => x.Id == id && x.PhotographerId == photographerId);
         if (booking is null) return NotFound();
-        var allowed = booking.Status == "Pending" && request.Status is ("Accepted" or "Rejected")
+        var allowed = booking.Status == "Pending" && request.Status is ("Confirmed" or "Rejected")
             || booking.Status == "Accepted" && request.Status == "Confirmed";
         if (!allowed) return Conflict(new { message = "This status change is not allowed for the current booking state." });
         booking.Status = request.Status;
@@ -154,13 +155,17 @@ public sealed class BookingsController(LensoraDbContext db) : ControllerBase
         var notification = await db.NotificationOutbox.SingleOrDefaultAsync(x =>
             x.Id == notificationId && x.BookingId == id && x.Booking!.PhotographerId == photographerId);
         if (notification is null) return NotFound();
-        if (notification.Status != "Failed")
+        if (notification.EventType == "Accepted")
+            return Conflict(new { message = "Accepted notifications are no longer sent. Confirm the booking to send a confirmation." });
+        if (notification.Status != NotificationStatus.Failed)
             return Conflict(new { message = "Only failed messages can be retried." });
-        notification.Status = "Queued";
+        notification.Status = NotificationStatus.Queued;
         notification.Attempts = 0;
         notification.NextAttemptUtc = DateTime.UtcNow;
         notification.LastError = null;
         await db.SaveChangesAsync();
+        logger.LogInformation("Notification retry requested. NotificationId: {NotificationId}; BookingId: {BookingId}; Channel: {Channel}; EventType: {EventType}",
+            notification.Id, notification.BookingId, notification.Channel, notification.EventType);
         return NoContent();
     }
     private async Task<int?> GetPhotographerId()

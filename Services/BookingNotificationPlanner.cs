@@ -6,6 +6,7 @@ public static class BookingNotificationPlanner
 {
     public static void Queue(Booking booking, string eventType, string? photographerEmail = null)
     {
+        if (eventType == "Accepted") return;
         var now = DateTime.UtcNow;
         booking.Notifications.Add(NewMessage(booking, eventType, "Email", booking.ClientEmail, now));
 
@@ -22,7 +23,7 @@ public static class BookingNotificationPlanner
         EventType = eventType,
         Channel = channel,
         Recipient = recipient,
-        Status = "Queued",
+        Status = NotificationStatus.Queued,
         CreatedUtc = now,
         NextAttemptUtc = now
     };
