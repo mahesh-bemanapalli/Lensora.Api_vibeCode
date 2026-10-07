@@ -367,3 +367,5 @@ build-check/EventLogChecks/bin/
 build-check/EventLogChecks/obj/
 FodyWeavers.xsd
 /EVENT_LOGGING.md
+
+build-check/category-change/
