@@ -24,7 +24,7 @@ public sealed class AdminContentController(
             if (profile is null) return Forbid();
 
             return Ok(new AdminProfileResponse(profile.Name, profile.Slug, profile.Bio, profile.Location,
-                profile.ProfileImageUrl, profile.ProfileImagePublicId));
+                profile.ProfileImageUrl, profile.ProfileImagePublicId, profile.HeroFocalX, profile.HeroFocalY));
         }
         catch (Exception exception)
         {
@@ -51,6 +51,8 @@ public sealed class AdminContentController(
             profile.Location = Clean(request.Location);
             profile.ProfileImageUrl = Clean(request.ProfileImageUrl);
             profile.ProfileImagePublicId = Clean(request.ProfileImagePublicId);
+            profile.HeroFocalX = request.HeroFocalX;
+            profile.HeroFocalY = request.HeroFocalY;
             await db.SaveChangesAsync();
             return NoContent();
         }

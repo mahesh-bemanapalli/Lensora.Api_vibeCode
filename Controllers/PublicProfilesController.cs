@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Lensora.Api.Contracts;
 using Lensora.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +13,20 @@ public sealed class PublicProfilesController(LensoraDbContext db) : ControllerBa
     {
         var photographer = await db.Photographers.AsNoTracking().Include(x => x.PortfolioItems).Include(x => x.GearItems).Include(x => x.Packages).SingleOrDefaultAsync(x => x.Slug == slug);
         if (photographer is null) return NotFound();
-        return Ok(new PublicProfileResponse(photographer.Name, photographer.Slug, photographer.Bio, photographer.Location, photographer.ProfileImageUrl, photographer.PortfolioItems.OrderBy(x => x.DisplayOrder).Select(x => new PortfolioItemResponse(x.Id, x.ImageUrl, x.ImagePublicId, x.Title, x.Category, x.DisplayOrder)).ToList(), photographer.GearItems.OrderBy(x => x.DisplayOrder).Select(x => new GearItemResponse(x.Id, x.Name, x.Category, x.Brand, x.Model, x.Description, x.ImageUrl, x.ImagePublicId, x.IsFeatured, x.DisplayOrder)).ToList(), photographer.Packages.Where(x => x.IsPublished).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new PackageResponse(x.Id, x.Name, x.Description, x.ImageUrl, x.ImagePublicId, x.Price, x.Currency, x.CoverageHours, x.Deliverables, x.IsPublished, x.DisplayOrder)).ToList()));
+        var portfolio = photographer.PortfolioItems.OrderBy(x => x.DisplayOrder)
+            .Select(x => new PortfolioItemResponse(x.Id, x.ImageUrl, x.ImagePublicId, x.Title,
+                string.IsNullOrWhiteSpace(x.Category) ? "Uncategorized" : x.Category.Trim(), x.DisplayOrder)).ToList();
+        var categories = portfolio.GroupBy(x => x.Category!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new PortfolioCategoryResponse(group.First().Category!, CategorySlug(group.Key, group.First().Id),
+                group.First().ImageUrl, group.Count()))
+            .OrderBy(category => category.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        return Ok(new PublicProfileResponse(photographer.Name, photographer.Slug, photographer.Bio,
+            photographer.Location, photographer.ProfileImageUrl, photographer.HeroFocalX, photographer.HeroFocalY,
+            categories, portfolio, photographer.GearItems.OrderBy(x => x.DisplayOrder).Select(x => new GearItemResponse(x.Id, x.Name, x.Category, x.Brand, x.Model, x.Description, x.ImageUrl, x.ImagePublicId, x.IsFeatured, x.DisplayOrder)).ToList(), photographer.Packages.Where(x => x.IsPublished).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new PackageResponse(x.Id, x.Name, x.Description, x.ImageUrl, x.ImagePublicId, x.Price, x.Currency, x.CoverageHours, x.Deliverables, x.IsPublished, x.DisplayOrder)).ToList()));
+    }
+    private static string CategorySlug(string category, int firstItemId)
+    {
+        var slug = Regex.Replace(Regex.Replace(category.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-"), @"^-|-$", "");
+        return string.IsNullOrEmpty(slug) ? $"category-{firstItemId}" : slug;
     }
 }
