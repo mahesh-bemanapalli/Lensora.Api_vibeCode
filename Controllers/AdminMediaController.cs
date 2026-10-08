@@ -9,8 +9,10 @@ public sealed class AdminMediaController(
     CloudinaryMediaService media,
     ILogger<AdminMediaController> logger) : ControllerBase
 {
+    private const long MaximumRequestSize = 21 * 1024 * 1024;
+
     [HttpPost("images")]
-    [RequestSizeLimit(10 * 1024 * 1024)]
+    [RequestSizeLimit(MaximumRequestSize)]
     public async Task<ActionResult<UploadImageResponse>> Upload([FromForm] UploadImageRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null) return BadRequest(new

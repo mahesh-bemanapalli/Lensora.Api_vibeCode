@@ -71,6 +71,8 @@ public sealed class Photographer
         get;
         set;
     }
+    public int HeroFocalX { get; set; } = 50;
+    public int HeroFocalY { get; set; } = 50;
     public User? User
     {
         get;

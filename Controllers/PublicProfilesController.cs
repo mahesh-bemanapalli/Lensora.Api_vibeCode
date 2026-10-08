@@ -21,7 +21,8 @@ public sealed class PublicProfilesController(LensoraDbContext db) : ControllerBa
                 group.First().ImageUrl, group.Count()))
             .OrderBy(category => category.Name, StringComparer.OrdinalIgnoreCase).ToList();
         return Ok(new PublicProfileResponse(photographer.Name, photographer.Slug, photographer.Bio,
-            photographer.Location, photographer.ProfileImageUrl, categories, portfolio, photographer.GearItems.OrderBy(x => x.DisplayOrder).Select(x => new GearItemResponse(x.Id, x.Name, x.Category, x.Brand, x.Model, x.Description, x.ImageUrl, x.ImagePublicId, x.IsFeatured, x.DisplayOrder)).ToList(), photographer.Packages.Where(x => x.IsPublished).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new PackageResponse(x.Id, x.Name, x.Description, x.ImageUrl, x.ImagePublicId, x.Price, x.Currency, x.CoverageHours, x.Deliverables, x.IsPublished, x.DisplayOrder)).ToList()));
+            photographer.Location, photographer.ProfileImageUrl, photographer.HeroFocalX, photographer.HeroFocalY,
+            categories, portfolio, photographer.GearItems.OrderBy(x => x.DisplayOrder).Select(x => new GearItemResponse(x.Id, x.Name, x.Category, x.Brand, x.Model, x.Description, x.ImageUrl, x.ImagePublicId, x.IsFeatured, x.DisplayOrder)).ToList(), photographer.Packages.Where(x => x.IsPublished).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id).Select(x => new PackageResponse(x.Id, x.Name, x.Description, x.ImageUrl, x.ImagePublicId, x.Price, x.Currency, x.CoverageHours, x.Deliverables, x.IsPublished, x.DisplayOrder)).ToList()));
     }
     private static string CategorySlug(string category, int firstItemId)
     {

@@ -4,10 +4,10 @@ namespace Lensora.Api.Services;
 
 public sealed class CloudinaryMediaService(IConfiguration configuration)
 {
-    private const long MaximumFileSize = 10 * 1024 * 1024;
+    private const long MaximumFileSize = 20 * 1024 * 1024;
     public async Task<(string Url, string PublicId)> UploadImage(IFormFile file, CancellationToken cancellationToken)
     {
-        if (file.Length is <= 0 or > MaximumFileSize) throw new ArgumentException("Image files must be between 1 byte and 10 MB.");
+        if (file.Length is <= 0 or > MaximumFileSize) throw new ArgumentException("Image files must be between 1 byte and 20 MB.");
         if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Only image files are allowed.");
         var cloudinary = new Cloudinary(new Account(Required("Cloudinary:CloudName"), Required("Cloudinary:ApiKey"), Required("Cloudinary:ApiSecret")));
         await using var stream = file.OpenReadStream();
