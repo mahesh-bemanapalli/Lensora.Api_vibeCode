@@ -24,7 +24,7 @@ public sealed class AdminContentController(
             if (profile is null) return Forbid();
 
             return Ok(new AdminProfileResponse(profile.Name, profile.Slug, profile.Bio, profile.Location,
-                profile.ProfileImageUrl, profile.ProfileImagePublicId, profile.HeroFocalX, profile.HeroFocalY));
+                profile.ProfileImageUrl, profile.ProfileImagePublicId, profile.HeroFocalX, profile.HeroFocalY, profile.TemplateKey));
         }
         catch (Exception exception)
         {
@@ -42,6 +42,8 @@ public sealed class AdminContentController(
             if (profile is null) return Forbid();
 
             var slug = request.Slug.Trim().ToLowerInvariant();
+            if (request.TemplateKey is not null && request.TemplateKey != profile.TemplateKey)
+                return StatusCode(403, new { message = "Only SuperAdmin can assign website designs from the platform dashboard." });
             if (await db.Photographers.AnyAsync(x => x.Slug == slug && x.Id != profile.Id))
                 return Conflict(new { message = "That public URL is already in use." });
 

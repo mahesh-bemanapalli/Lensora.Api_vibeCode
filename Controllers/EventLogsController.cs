@@ -2,11 +2,12 @@ using Lensora.Api.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Lensora.Api.Controllers;
 
-[ApiController, Authorize, Route("api/admin/event-logs")]
-public sealed class EventLogsController(EventLogDbContext db) : ControllerBase
+[ApiController, Authorize(Roles = "SuperAdmin"), Route("api/admin/event-logs")]
+public sealed class EventLogsController(EventLogDbContext db, LensoraDbContext accounts) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] DateTime? fromUtc, [FromQuery] DateTime? toUtc,
@@ -14,6 +15,8 @@ public sealed class EventLogsController(EventLogDbContext db) : ControllerBase
         [FromQuery] int? statusCode, [FromQuery] long? beforeId, [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
+        var subject = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!int.TryParse(subject, out var actorId) || !await accounts.Users.AnyAsync(x => x.Id == actorId && x.Role == "SuperAdmin", cancellationToken)) return Forbid();
         if (pageSize is < 1 or > 100 || beforeId <= 0 || statusCode is < 100 or > 599 ||
             route?.Length > 512 || traceId?.Length > 128 ||
             (level is not null && level is not ("Information" or "Warning" or "Error" or "Critical")))

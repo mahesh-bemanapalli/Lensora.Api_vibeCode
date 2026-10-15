@@ -5,6 +5,8 @@ namespace Lensora.Api.Infrastructure;
 public sealed class LensoraDbContext(DbContextOptions<LensoraDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+    public DbSet<TemplateAssignment> TemplateAssignments => Set<TemplateAssignment>();
     public DbSet<Photographer> Photographers => Set<Photographer>();
     public DbSet<PortfolioItem> PortfolioItems => Set<PortfolioItem>();
     public DbSet<GearItem> GearItems => Set<GearItem>();
@@ -13,6 +15,26 @@ public sealed class LensoraDbContext(DbContextOptions<LensoraDbContext> options)
     public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<MediaAsset>(entity =>
+        {
+            entity.Property(x => x.FileName).HasMaxLength(255);
+            entity.Property(x => x.Url).HasMaxLength(2048);
+            entity.Property(x => x.PublicId).HasMaxLength(255);
+            entity.Property(x => x.ContentHash).HasMaxLength(64);
+            entity.Property(x => x.Kind).HasMaxLength(16);
+            entity.Property(x => x.ContentType).HasMaxLength(100);
+            entity.Property(x => x.Status).HasMaxLength(16);
+            entity.HasIndex(x => new { x.PhotographerId, x.ContentHash });
+            entity.HasOne<Photographer>().WithMany().HasForeignKey(x => x.PhotographerId).OnDelete(DeleteBehavior.NoAction);
+        });
+        model.Entity<TemplateAssignment>(entity =>
+        {
+            entity.Property(x => x.PreviousTemplateKey).HasMaxLength(40);
+            entity.Property(x => x.TemplateKey).HasMaxLength(40);
+            entity.HasOne<Photographer>().WithMany().HasForeignKey(x => x.PhotographerId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AssignedByUserId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasIndex(x => new { x.PhotographerId, x.AssignedUtc });
+        });
         model.Entity<User>(entity =>
         {
             entity.HasIndex(x => x.Email).IsUnique();
@@ -25,6 +47,7 @@ public sealed class LensoraDbContext(DbContextOptions<LensoraDbContext> options)
             entity.HasIndex(x => x.UserId).IsUnique();
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.Property(x => x.Slug).HasMaxLength(120);
+            entity.Property(x => x.TemplateKey).HasMaxLength(40).HasDefaultValue("editorial");
             entity.HasOne(x => x.User).WithOne(x => x.Photographer).HasForeignKey<Photographer>(x => x.UserId);
         }
         );

@@ -4,16 +4,22 @@ using Lensora.Api.Infrastructure;
 using Lensora.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 namespace Lensora.Api.Controllers;
 
 [ApiController, Route("api/auth")]
 public sealed class AuthController(LensoraDbContext db, JwtTokenService tokens, ILogger<AuthController> logger, IHostEnvironment environment) : ControllerBase
 {
-    [HttpPost("register")]
+    [Authorize(Roles = "SuperAdmin"), HttpPost("register")]
     public async Task<ActionResult<TokenResponse>> Register(RegisterRequest request)
     {
         try
         {
+            var subject = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+            if (!int.TryParse(subject, out var actorId) || !await db.Users.AnyAsync(x => x.Id == actorId && x.Role == "SuperAdmin")) return Forbid();
+            if (request.TemplateKey != "editorial")
+                return BadRequest(new { message = "New accounts use Editorial. Only SuperAdmin can assign another design." });
             var email = request.Email.Trim().ToLowerInvariant();
             var slug = request.Slug.Trim().ToLowerInvariant();
             if (await db.Users.AnyAsync(x => x.Email == email) || await db.Photographers.AnyAsync(x => x.Slug == slug)) return Conflict(new
@@ -33,7 +39,8 @@ public sealed class AuthController(LensoraDbContext db, JwtTokenService tokens, 
             {
                 User = user,
                 Name = request.Name.Trim(),
-                Slug = slug
+                Slug = slug,
+                TemplateKey = request.TemplateKey
             }
             );
             await db.SaveChangesAsync();
@@ -41,6 +48,8 @@ public sealed class AuthController(LensoraDbContext db, JwtTokenService tokens, 
         }
         catch (DbUpdateException exception)
         {
+            if (DisplayOrderConflict.IsUniqueIndexViolation(exception))
+                return Conflict(new { message = "Email or photographer URL is already in use." });
             logger.LogError(exception, "Database failed while registering a photographer.");
             return ServerError("Registration could not be saved. Check the database connection and schema.", exception);
         }
