@@ -71,6 +71,8 @@ public sealed class Photographer
         get;
         set;
     }
+    public string TemplateKey { get; set; } = "editorial";
+    public long StorageLimitBytes { get; set; } = 5_000_000_000L;
     public int HeroFocalX { get; set; } = 50;
     public int HeroFocalY { get; set; } = 50;
     public User? User
@@ -274,6 +276,31 @@ public sealed class Booking
         get;
         set;
     }
+}
+
+public sealed class MediaAsset
+{
+    public long Id { get; set; }
+    public int PhotographerId { get; set; }
+    public required string FileName { get; set; }
+    public required string Url { get; set; }
+    public string? PublicId { get; set; }
+    public string? ContentHash { get; set; }
+    public required string Kind { get; set; }
+    public required string ContentType { get; set; }
+    public long? SizeBytes { get; set; }
+    public required string Status { get; set; }
+    public DateTime CreatedUtc { get; set; }
+}
+
+public sealed class TemplateAssignment
+{
+    public long Id { get; set; }
+    public int PhotographerId { get; set; }
+    public int AssignedByUserId { get; set; }
+    public required string PreviousTemplateKey { get; set; }
+    public required string TemplateKey { get; set; }
+    public DateTime AssignedUtc { get; set; }
 }
 
 public sealed class NotificationOutbox

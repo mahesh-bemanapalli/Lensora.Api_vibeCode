@@ -369,3 +369,8 @@ FodyWeavers.xsd
 /EVENT_LOGGING.md
 
 build-check/category-change/
+
+# Generated local verification builds and logs
+/build-check/
+/outputs/
+**/*.log
